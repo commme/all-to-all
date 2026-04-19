@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 런타임 폴더
+input/
+output/
+_uploads/
+_tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 환경
+.env
+venv/
+.venv/
+
+# 도구 상태 (자동 생성)
+.omc/
+.bkit/
+.claude/

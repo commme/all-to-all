@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All-to-All Converter</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 0.8rem;
+    margin-bottom: 28px;
+  }
+
+  /* Drop Zone */
+  .dropzone {
+    border: 2px dashed #333;
+    border-radius: 16px;
+    padding: 44px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #161616;
+  }
+  .dropzone:hover, .dropzone.drag-over {
+    border-color: #4f8cff;
+    background: #1a1f2e;
+  }
+  .dropzone-icon { font-size: 2.2rem; margin-bottom: 10px; }
+  .dropzone-text { color: #999; font-size: 0.85rem; }
+  .dropzone-text strong { color: #4f8cff; }
+  .dropzone-hint { color: #555; font-size: 0.75rem; margin-top: 8px; }
+
+  #fileInput { display: none; }
+
+  /* File List */
+  .file-list {
+    display: none;
+    margin-top: 16px;
+  }
+  .file-list.show { display: block; }
+
+  .file-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .file-count {
+    font-size: 0.85rem;
+    color: #999;
+  }
+  .file-count strong { color: #fff; }
+  .clear-btn {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 4px 10px;
+  }
+  .clear-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+  }
+  .file-ext {
+    width: 38px; height: 28px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.6rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    background: #1e2a3a; color: #60a5fa;
+  }
+  .file-ext.image { background: #1e3a2f; color: #4ade80; }
+  .file-ext.document { background: #2a1e3a; color: #a78bfa; }
+  .file-ext.video { background: #1e2a3a; color: #60a5fa; }
+  .file-item-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ccc;
+  }
+  .file-item-size { color: #555; font-size: 0.75rem; flex-shrink: 0; }
+  .file-item-remove {
+    background: none; border: none;
+    color: #555; cursor: pointer; font-size: 1rem;
+    padding: 0 4px;
+  }
+  .file-item-remove:hover { color: #ff6b6b; }
+
+  /* Format Selection */
+  .format-section {
+    display: none;
+    margin-top: 20px;
+  }
+  .format-section.show { display: block; }
+  .format-label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 10px;
+  }
+  .format-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .fmt-btn {
+    padding: 12px 16px;
+    border: 1px solid #333;
+    border-radius: 10px;
+    background: #1a1a1a;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.15s;
+    text-align: left;
+    min-width: 140px;
+    flex: 1;
+  }
+  .fmt-btn:hover {
+    border-color: #4f8cff;
+    color: #fff;
+    background: #1a1f2e;
+  }
+  .fmt-btn.selected {
+    border-color: #4f8cff;
+    background: #1e2d4a;
+    color: #4f8cff;
+  }
+  .fmt-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: block;
+  }
+  .fmt-desc {
+    font-size: 0.72rem;
+    color: #666;
+    display: block;
+    margin-top: 3px;
+  }
+  .fmt-btn:hover .fmt-desc { color: #999; }
+  .fmt-btn.selected .fmt-desc { color: #6ba3ff; }
+
+  /* Convert Button */
+  .convert-btn {
+    display: none;
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #4f8cff;
+    color: #fff;
+  }
+  .convert-btn.show { display: block; }
+  .convert-btn:hover { background: #3d7ae8; }
+
+  /* Progress */
+  .progress {
+    display: none;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .progress.show { display: block; }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid #333;
+    border-top-color: #4f8cff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress-text { color: #888; font-size: 0.9rem; }
+
+  /* Result */
+  .result {
+    display: none;
+    margin-top: 20px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .result.show { display: block; }
+  .result.success { background: #1a2e1a; border: 1px solid #2d4a2d; }
+  .result.error { background: #2e1a1a; border: 1px solid #4a2d2d; }
+  .result-icon { font-size: 1.5rem; margin-bottom: 8px; }
+  .result-msg { font-size: 0.9rem; }
+  .result.success .result-msg { color: #4ade80; }
+  .result.error .result-msg { color: #ff6b6b; }
+
+  .again-btn {
+    margin-top: 12px;
+    padding: 8px 20px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: #1a1a1a;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .again-btn:hover { border-color: #4f8cff; color: #fff; }
+
+  /* Supported formats */
+  .supported {
+    margin-top: 28px;
+  }
+  .supported-title {
+    font-size: 0.75rem;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    padding-left: 2px;
+  }
+  .sup-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .sup-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .sup-from {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #ccc;
+    background: #222;
+    padding: 3px 8px;
+    border-radius: 5px;
+  }
+  .sup-arrow { color: #444; font-size: 0.8rem; }
+  .sup-to {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .sup-target {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #4f8cff;
+    background: #1a1f2e;
+    padding: 3px 8px;
+    border-radius: 5px;
+  }
+  .sup-desc {
+    font-size: 0.72rem;
+    color: #555;
+    padding-left: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>All-to-All Converter</h1>
+  <p class="subtitle">여러 파일 한번에 변환 · 오프라인 · 내 PC에서만</p>
+
+  <!-- Drop Zone -->
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">📁</div>
+    <div class="dropzone-text">
+      파일을 여기에 드래그하거나 <strong>클릭</strong>하여 선택
+    </div>
+    <div class="dropzone-hint">여러 파일 동시 선택 가능</div>
+  </div>
+  <input type="file" id="fileInput" multiple>
+
+  <!-- File List -->
+  <div class="file-list" id="fileList">
+    <div class="file-list-header">
+      <div class="file-count" id="fileCount"></div>
+      <button class="clear-btn" id="clearBtn">전체 삭제</button>
+    </div>
+    <div id="fileItems"></div>
+  </div>
+
+  <!-- Format Selection -->
+  <div class="format-section" id="formatSection">
+    <div class="format-label" id="formatLabel">변환할 포맷 선택</div>
+    <div class="format-grid" id="formatGrid"></div>
+  </div>
+
+  <!-- Convert Button -->
+  <button class="convert-btn" id="convertBtn">변환하기</button>
+
+  <!-- Progress -->
+  <div class="progress" id="progress">
+    <div class="spinner"></div>
+    <div class="progress-text" id="progressText">변환 중...</div>
+  </div>
+
+  <!-- Result -->
+  <div class="result" id="result">
+    <div class="result-icon" id="resultIcon"></div>
+    <div class="result-msg" id="resultMsg"></div>
+    <button class="again-btn" id="againBtn">다시 변환하기</button>
+  </div>
+
+  <!-- Supported Conversions -->
+  <div class="supported">
+    <div class="supported-title">지원하는 변환</div>
+
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">PNG / JPG</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">JPG</span>
+          <span class="sup-target">PNG</span>
+          <span class="sup-target">WEBP</span>
+          <span class="sup-target">PDF</span>
+        </div>
+      </div>
+      <div class="sup-desc">용량 줄이기, 웹 최적화, 문서 제출용 변환</div>
+    </div>
+
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">PDF</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">PNG</span>
+          <span class="sup-target">JPG</span>
+        </div>
+      </div>
+      <div class="sup-desc">PDF를 이미지로 캡처해서 카톡/슬랙 공유</div>
+    </div>
+
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">HWP</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">PDF</span>
+          <span class="sup-target">PNG</span>
+        </div>
+      </div>
+      <div class="sup-desc">한글 파일을 PDF/이미지로 변환 (제출, 공유)</div>
+    </div>
+
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">MP4 / 영상</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">MP3</span>
+          <span class="sup-target">GIF</span>
+          <span class="sup-target">WAV</span>
+        </div>
+      </div>
+      <div class="sup-desc">영상에서 음성 추출, 움짤 만들기</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fileListEl = document.getElementById('fileList');
+const fileItems = document.getElementById('fileItems');
+const fileCount = document.getElementById('fileCount');
+const clearBtn = document.getElementById('clearBtn');
+const formatSection = document.getElementById('formatSection');
+const formatLabel = document.getElementById('formatLabel');
+const formatGrid = document.getElementById('formatGrid');
+const convertBtn = document.getElementById('convertBtn');
+const progress = document.getElementById('progress');
+const progressText = document.getElementById('progressText');
+const result = document.getElementById('result');
+const resultIcon = document.getElementById('resultIcon');
+const resultMsg = document.getElementById('resultMsg');
+const againBtn = document.getElementById('againBtn');
+
+let files = [];
+let selectedFormat = null;
+
+const catMap = {
+  image: { cls: 'image', label: '이미지' },
+  document: { cls: 'document', label: '문서' },
+  video: { cls: 'video', label: '영상' },
+};
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+function getExt(name) {
+  const i = name.lastIndexOf('.');
+  return i >= 0 ? name.substring(i).toLowerCase() : '';
+}
+
+// Drag & drop
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  addFiles(Array.from(e.dataTransfer.files));
+});
+fileInput.addEventListener('change', () => {
+  addFiles(Array.from(fileInput.files));
+  fileInput.value = '';
+});
+
+clearBtn.addEventListener('click', reset);
+againBtn.addEventListener('click', reset);
+
+function reset() {
+  files = [];
+  selectedFormat = null;
+  fileListEl.classList.remove('show');
+  formatSection.classList.remove('show');
+  convertBtn.classList.remove('show');
+  progress.classList.remove('show');
+  result.classList.remove('show');
+  dropzone.style.display = '';
+  fileItems.innerHTML = '';
+}
+
+function addFiles(newFiles) {
+  files = files.concat(newFiles);
+  renderFileList();
+  fetchFormats();
+}
+
+function removeFile(idx) {
+  files.splice(idx, 1);
+  if (files.length === 0) {
+    reset();
+    return;
+  }
+  renderFileList();
+  fetchFormats();
+}
+
+function renderFileList() {
+  dropzone.style.display = 'none';
+  result.classList.remove('show');
+  progress.classList.remove('show');
+
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  fileCount.innerHTML = `<strong>${files.length}개</strong> 파일 · ${formatBytes(totalSize)}`;
+
+  fileItems.innerHTML = '';
+  files.forEach((f, i) => {
+    const ext = getExt(f.name).replace('.', '');
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `
+      <div class="file-ext">${ext.toUpperCase()}</div>
+      <div class="file-item-name">${f.name}</div>
+      <div class="file-item-size">${formatBytes(f.size)}</div>
+      <button class="file-item-remove" data-idx="${i}">&times;</button>
+    `;
+    div.querySelector('.file-item-remove').addEventListener('click', () => removeFile(i));
+    fileItems.appendChild(div);
+  });
+
+  fileListEl.classList.add('show');
+}
+
+async function fetchFormats() {
+  if (!files.length) return;
+  selectedFormat = null;
+  convertBtn.classList.remove('show');
+
+  // 첫 번째 파일 기준으로 포맷 추천
+  const ext = getExt(files[0].name);
+
+  try {
+    const resp = await fetch('/api/formats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ext })
+    });
+    const data = await resp.json();
+
+    if (data.targets.length === 0) {
+      formatLabel.textContent = '이 파일 형식은 지원되지 않습니다';
+      formatGrid.innerHTML = '';
+      formatSection.classList.add('show');
+      return;
+    }
+
+    formatLabel.textContent = `${files.length}개 파일을 어떤 포맷으로?`;
+    formatGrid.innerHTML = '';
+
+    data.targets.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'fmt-btn';
+      btn.innerHTML = `<span class="fmt-name">${t.name}</span><span class="fmt-desc">${t.desc}</span>`;
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedFormat = t.ext;
+        convertBtn.textContent = `${files.length}개 파일 → ${t.name} 변환하기`;
+        convertBtn.classList.add('show');
+      });
+      formatGrid.appendChild(btn);
+    });
+
+    formatSection.classList.add('show');
+  } catch (err) {
+    formatLabel.textContent = '포맷 목록을 불러올 수 없습니다';
+    formatSection.classList.add('show');
+  }
+}
+
+// Convert
+convertBtn.addEventListener('click', async () => {
+  if (!files.length || !selectedFormat) return;
+
+  convertBtn.classList.remove('show');
+  formatSection.classList.remove('show');
+  fileListEl.classList.remove('show');
+  result.classList.remove('show');
+  progress.classList.add('show');
+  progressText.textContent = `${files.length}개 파일 변환 중...`;
+
+  const formData = new FormData();
+  files.forEach(f => formData.append('files', f));
+  formData.append('target', selectedFormat);
+
+  try {
+    const resp = await fetch('/api/convert', { method: 'POST', body: formData });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: '변환 실패' }));
+      showResult(false, err.error || '변환 실패');
+      return;
+    }
+
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename[^;=\n]*=(?:UTF-8''|"?)([^";\n]*)/i);
+    const dlName = match ? decodeURIComponent(match[1]) : 'converted' + selectedFormat;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = dlName;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showResult(true, `${dlName} 다운로드 완료`);
+  } catch (err) {
+    showResult(false, '서버 연결 오류');
+  }
+});
+
+function showResult(ok, msg) {
+  progress.classList.remove('show');
+  result.className = 'result show ' + (ok ? 'success' : 'error');
+  resultIcon.textContent = ok ? '✓' : '✕';
+  resultMsg.textContent = msg;
+}
+</script>
+
+</body>
+</html>
