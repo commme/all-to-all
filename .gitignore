@@ -30,3 +30,7 @@ venv/
 .omc/
 .bkit/
 .claude/
+
+# 내부 검수 산출물 (public repo 제외)
+qa-audit/
+security-audit/

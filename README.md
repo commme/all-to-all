@@ -1,18 +1,30 @@
 # All-to-All File Converter
 
-로컬에서 실행하는 파일 변환기. 이미지, 문서, 영상, 오디오를 변환합니다.  
+파일 변환기 · 이미지·PDF·영상·오디오·문서·HTML을 서로 변환합니다.  
 **파일이 외부 서버로 전송되지 않습니다.**
+
+## 🌐 두 가지 실행 모드
+
+| 모드 | 실행 방식 | 지원 변환 | 설치 |
+|------|---------|----------|------|
+| **웹 (정적)** | [GitHub Pages](./docs/) · 브라우저만 | 이미지 ↔ 이미지, 이미지 ↔ PDF | ❌ 설치 불필요 |
+| **로컬 서버** | `py web.py` · Python + FFmpeg + LibreOffice + Playwright | **전체** (영상/오디오/HTML/HWP 포함) | ✅ 설치 필요 |
+
+👉 **간단한 이미지/PDF 변환** → [웹 버전 바로 가기](https://commme.github.io/all-to-all/) (업로드 없음, 즉시 변환)  
+👉 **영상·HTML·HWP 변환** → 로컬 서버 버전 설치 (아래 가이드)
 
 ## 지원하는 변환
 
-| 소스 | 변환 가능 | 용도 |
-|------|----------|------|
-| PNG / JPG | → JPG, PNG, WEBP, PDF | 용량 줄이기, 웹 최적화, 문서 제출 |
-| PDF | → PNG, JPG | 이미지로 캡처/공유 (카톡, 슬랙) |
-| HWP | → PDF, PNG | 한글 파일 PDF/이미지 변환 (제출용) |
-| MP4 / 영상 | → MP3, GIF, WAV | 음성 추출, 움짤 만들기 |
+| 소스 | 변환 가능 | 모드 | 용도 |
+|------|----------|------|------|
+| PNG / JPG / WEBP / BMP / GIF | → PNG, JPG, WEBP, PDF | 웹·서버 | 용량 줄이기, 웹 최적화, 문서 제출 |
+| PDF | → PNG, JPG, WEBP | 웹·서버 | 이미지로 캡처/공유 (카톡, 슬랙) |
+| HTML / HTM | → PNG, PDF, MP4, GIF, WEBM | 서버 | 웹 페이지/애니메이션 → 이미지/영상 |
+| HWP / DOCX / PPTX | → PDF, PNG | 서버 | 한글·Office 파일 PDF/이미지 변환 |
+| MP4 / 영상 | → MP3, GIF, WAV, 다른 영상 | 서버 | 음성 추출, 움짤 만들기, 포맷 변환 |
+| MP3 / 오디오 | → WAV, FLAC, AAC, OGG | 서버 | 오디오 포맷 변환 |
 
-> 위 8가지가 핵심이며, CLI에서는 40+ 포맷 조합을 모두 지원합니다.
+> CLI에서는 40+ 포맷 조합을 모두 지원합니다.
 
 ---
 
@@ -28,11 +40,17 @@ pip install -r requirements.txt
 - **pypdfium2** — PDF → 이미지
 - **Flask** — 웹 UI 서버
 
-### 2. 시스템 도구 (선택)
+### 2. Playwright 브라우저 (HTML 변환용)
+
+```bash
+playwright install chromium
+```
+
+### 3. 시스템 도구 (선택)
 
 | 도구 | 용도 | 없으면 |
 |------|------|--------|
-| [FFmpeg](https://ffmpeg.org/download.html) | 오디오/비디오 변환 | 영상·음성 변환 불가 |
+| [FFmpeg](https://ffmpeg.org/download.html) | 오디오/비디오/HTML→영상 변환 | 영상·음성·HTML→MP4 변환 불가 |
 | [LibreOffice](https://www.libreoffice.org/download/) | HWP/DOCX → PDF | 문서 변환 불가 |
 
 ---
@@ -128,16 +146,31 @@ Python으로 파일 포맷 변환기를 만들어줘.
 
 ```
 all-to-all/
-├── convert.py          ← 변환 엔진 + CLI
-├── web.py              ← Flask 웹 서버
+├── convert.py          ← 변환 엔진 + CLI (HTML 핸들러 포함)
+├── web.py              ← Flask 웹 서버 (전체 기능)
 ├── templates/
-│   └── index.html      ← 웹 UI
-├── requirements.txt    ← Python 의존성
+│   └── index.html      ← 서버 모드 웹 UI
+├── docs/               ← GitHub Pages 정적 버전 (이미지/PDF만)
+│   ├── index.html      ← 정적 UI
+│   ├── app.js          ← 클라이언트 사이드 변환 로직
+│   └── style.css
+├── requirements.txt    ← Python 의존성 (Playwright 포함)
 ├── input/              ← CLI 배치 변환용 입력 폴더
 ├── output/             ← 변환 결과 출력 폴더
 ├── LICENSE             ← MIT License
 └── README.md           ← 이 파일
 ```
+
+## GitHub Pages 배포
+
+`docs/` 폴더를 GitHub Pages로 배포:
+
+1. GitHub 레포 → Settings → Pages
+2. Source: **Deploy from a branch**
+3. Branch: **main** · Folder: **/docs**
+4. Save → 몇 분 뒤 `https://{유저}.github.io/all-to-all/` 접속 가능
+
+정적 버전은 이미지/PDF 변환만 지원합니다. 영상·HTML·HWP 등 서버 전용 변환은 로컬에서 `py web.py`로 실행하세요.
 
 ---
 

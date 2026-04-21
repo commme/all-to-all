@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self';">
 <title>All-to-All Converter</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -112,6 +115,40 @@
   .file-ext.image { background: #1e3a2f; color: #4ade80; }
   .file-ext.document { background: #2a1e3a; color: #a78bfa; }
   .file-ext.video { background: #1e2a3a; color: #60a5fa; }
+  .file-ext.web { background: #3a2a1e; color: #fbbf24; }
+
+  /* Mode banner linking to static edition */
+  .mode-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #1a2030 0%, #1a1e28 100%);
+    border: 1px solid #2a3547;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.8rem;
+  }
+  .mode-badge {
+    background: #1e3a2f;
+    color: #4ade80;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+  }
+  .mode-desc { color: #888; flex: 1; }
+  .mode-link {
+    color: #4f8cff;
+    text-decoration: none;
+    font-size: 0.75rem;
+    border: 1px solid #2a3547;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .mode-link:hover { border-color: #4f8cff; background: #1e2d4a; }
   .file-item-name {
     flex: 1;
     white-space: nowrap;
@@ -305,6 +342,15 @@
   <h1>All-to-All Converter</h1>
   <p class="subtitle">여러 파일 한번에 변환 · 오프라인 · 내 PC에서만</p>
 
+  <!-- Mode banner: full server mode, link to web/static edition -->
+  <div class="mode-banner">
+    <span class="mode-badge">🖥️ 서버 버전</span>
+    <span class="mode-desc">영상·HTML·HWP 포함 전체 기능</span>
+    <a href="https://commme.github.io/all-to-all/" class="mode-link" target="_blank" rel="noopener">
+      간단한 이미지/PDF만 필요하면 → 웹 버전
+    </a>
+  </div>
+
   <!-- Drop Zone -->
   <div class="dropzone" id="dropzone">
     <div class="dropzone-icon">📁</div>
@@ -399,6 +445,20 @@
         </div>
       </div>
       <div class="sup-desc">영상에서 음성 추출, 움짤 만들기</div>
+    </div>
+
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">HTML</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">PNG</span>
+          <span class="sup-target">PDF</span>
+          <span class="sup-target">MP4</span>
+          <span class="sup-target">GIF</span>
+        </div>
+      </div>
+      <div class="sup-desc">웹 페이지/애니메이션을 이미지/영상으로 · Playwright 필요</div>
     </div>
 
   </div>

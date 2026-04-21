@@ -41,8 +41,9 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif",
 DOC_EXTS = {".pdf", ".docx", ".pptx", ".xlsx", ".hwp", ".hwpx", ".odt", ".odp", ".ods", ".txt"}
 AUDIO_EXTS = {".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma"}
 VIDEO_EXTS = {".mp4", ".avi", ".mkv", ".mov", ".webm", ".wmv", ".flv"}
+WEB_EXTS = {".html", ".htm"}
 
-ALL_EXTS = IMAGE_EXTS | DOC_EXTS | AUDIO_EXTS | VIDEO_EXTS
+ALL_EXTS = IMAGE_EXTS | DOC_EXTS | AUDIO_EXTS | VIDEO_EXTS | WEB_EXTS
 
 
 def get_category(ext: str) -> str:
@@ -55,6 +56,8 @@ def get_category(ext: str) -> str:
         return "audio"
     if ext in VIDEO_EXTS:
         return "video"
+    if ext in WEB_EXTS:
+        return "web"
     return "unknown"
 
 
@@ -96,6 +99,9 @@ FORMAT_INFO = {
     ".webm": {"name": "WEBM", "desc": "웹 영상 (VP9)", "priority": 5},
     ".wmv":  {"name": "WMV",  "desc": "Windows 영상", "priority": 6},
     ".flv":  {"name": "FLV",  "desc": "Flash 영상 (레거시)", "priority": 7},
+    # 웹
+    ".html": {"name": "HTML", "desc": "웹 페이지", "priority": 1},
+    ".htm":  {"name": "HTM",  "desc": "웹 페이지", "priority": 99},
 }
 
 
@@ -118,6 +124,8 @@ def get_supported_targets(src_ext: str) -> list[str]:
         targets = list(VIDEO_EXTS - {src_ext})
         targets.extend(list(AUDIO_EXTS))
         targets.append(".gif")
+    elif cat == "web":
+        targets = [".png", ".jpg", ".webp", ".pdf", ".mp4", ".gif", ".webm"]
 
     targets.sort(key=lambda x: FORMAT_INFO.get(x, {}).get("priority", 50))
     return targets
@@ -351,6 +359,178 @@ def convert_video(src: Path, target_ext: str, out_dir: Path) -> bool:
     return True
 
 
+# ── HTML 변환 (Playwright) ───────────────────────────────────
+
+HTML_DEFAULTS = {
+    "width": 1200,
+    "height": 800,
+    "fps": 30,
+    "duration": 8.0,
+    "screenshot_delay": 2.0,
+}
+
+
+def _html_src_url(src: Path) -> str:
+    """Windows 경로 → file:// URL 안전 변환"""
+    return src.resolve().as_uri()
+
+
+def html_to_image(src: Path, target_ext: str, out_dir: Path,
+                  width: int = None, height: int = None) -> bool:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  [오류] playwright 미설치: pip install playwright && playwright install chromium")
+        return False
+
+    W = width or HTML_DEFAULTS["width"]
+    H = height or HTML_DEFAULTS["height"]
+    out_path = out_dir / f"{src.stem}{target_ext}"
+
+    # Playwright screenshot은 png/jpeg만 직접 지원 → 그 외는 Pillow로 후처리
+    direct = target_ext in (".png", ".jpg", ".jpeg")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(viewport={"width": W, "height": H},
+                                       device_scale_factor=1)
+            page = ctx.new_page()
+            page.goto(_html_src_url(src), wait_until="networkidle", timeout=60000)
+            page.wait_for_timeout(int(HTML_DEFAULTS["screenshot_delay"] * 1000))
+
+            if direct:
+                page.screenshot(path=str(out_path),
+                                type="jpeg" if target_ext in (".jpg", ".jpeg") else "png",
+                                full_page=False, omit_background=False)
+                browser.close()
+                print(f"  ✓ {out_path.name}")
+                return True
+
+            # WEBP 등: 먼저 PNG로 저장 후 Pillow 변환
+            import tempfile as _tmp
+            tmp_png = Path(_tmp.mkdtemp()) / "shot.png"
+            page.screenshot(path=str(tmp_png), type="png", full_page=False)
+            browser.close()
+
+        from PIL import Image
+        img = Image.open(str(tmp_png))
+        save_kwargs = {}
+        if target_ext == ".webp":
+            save_kwargs["quality"] = 90
+        img.save(str(out_path), **save_kwargs)
+        shutil.rmtree(tmp_png.parent, ignore_errors=True)
+        print(f"  ✓ {out_path.name}")
+        return True
+    except Exception as e:
+        print(f"  [오류] HTML 렌더링 실패: {e}")
+        return False
+
+
+def html_to_pdf(src: Path, out_dir: Path,
+                width: int = None, height: int = None) -> bool:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  [오류] playwright 미설치: pip install playwright && playwright install chromium")
+        return False
+
+    W = width or HTML_DEFAULTS["width"]
+    H = height or HTML_DEFAULTS["height"]
+    out_path = out_dir / f"{src.stem}.pdf"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(viewport={"width": W, "height": H})
+            page = ctx.new_page()
+            page.goto(_html_src_url(src), wait_until="networkidle", timeout=60000)
+            page.wait_for_timeout(int(HTML_DEFAULTS["screenshot_delay"] * 1000))
+            page.pdf(path=str(out_path),
+                     width=f"{W}px", height=f"{H}px",
+                     print_background=True)
+            browser.close()
+        print(f"  ✓ {out_path.name}")
+        return True
+    except Exception as e:
+        print(f"  [오류] HTML → PDF 실패: {e}")
+        return False
+
+
+def html_to_video(src: Path, target_ext: str, out_dir: Path,
+                  width: int = None, height: int = None,
+                  fps: int = None, duration: float = None) -> bool:
+    """HTML 애니메이션을 프레임 캡처 → FFmpeg 조립."""
+    if not FFMPEG:
+        print("  [오류] FFmpeg 미설치 (HTML → 영상에 필요)")
+        return False
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  [오류] playwright 미설치: pip install playwright && playwright install chromium")
+        return False
+
+    W = width or HTML_DEFAULTS["width"]
+    H = height or HTML_DEFAULTS["height"]
+    FPS = fps or HTML_DEFAULTS["fps"]
+    DUR = duration or HTML_DEFAULTS["duration"]
+    total_frames = max(1, int(round(FPS * DUR)))
+
+    out_path = out_dir / f"{src.stem}{target_ext}"
+    tmp_dir = Path(tempfile.mkdtemp(prefix="html2vid_"))
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(viewport={"width": W, "height": H},
+                                       device_scale_factor=1)
+            page = ctx.new_page()
+            page.goto(_html_src_url(src), wait_until="networkidle", timeout=60000)
+            page.wait_for_timeout(2000)
+
+            # 웹 애니메이션 현재시간 리셋
+            page.evaluate("() => document.getAnimations?.().forEach(a => { try { a.currentTime = 0; a.play(); } catch(e){} })")
+
+            interval_ms = 1000.0 / FPS
+            for i in range(total_frames):
+                t = i * interval_ms
+                page.evaluate(
+                    "(t) => document.getAnimations?.().forEach(a => { try { a.currentTime = t; } catch(e){} })",
+                    t,
+                )
+                frame_file = tmp_dir / f"f_{i:05d}.png"
+                page.screenshot(path=str(frame_file), type="png")
+            browser.close()
+
+        # FFmpeg 조립
+        frames_pattern = str(tmp_dir / "f_%05d.png")
+        if target_ext == ".gif":
+            vf = f"fps={min(15, FPS)},scale={min(800, W)}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5"
+            cmd = [FFMPEG, "-y", "-framerate", str(FPS), "-i", frames_pattern,
+                   "-vf", vf, "-loop", "0", str(out_path)]
+        elif target_ext == ".webm":
+            cmd = [FFMPEG, "-y", "-framerate", str(FPS), "-i", frames_pattern,
+                   "-c:v", "libvpx-vp9", "-b:v", "2M", "-pix_fmt", "yuv420p",
+                   str(out_path)]
+        else:  # .mp4 및 기본
+            cmd = [FFMPEG, "-y", "-framerate", str(FPS), "-i", frames_pattern,
+                   "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
+                   "-movflags", "+faststart", str(out_path)]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"  [오류] FFmpeg 실패: {result.stderr[-200:]}")
+            return False
+
+        print(f"  ✓ {out_path.name}")
+        return True
+    except Exception as e:
+        print(f"  [오류] HTML → 영상 실패: {e}")
+        return False
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 # ── 통합 변환 디스패처 ───────────────────────────────────────
 
 def convert(src: Path, target_ext: str, out_dir: Path = None) -> bool:
@@ -397,6 +577,15 @@ def convert(src: Path, target_ext: str, out_dir: Path = None) -> bool:
         if tgt_cat in ("video", "audio") or target_ext == ".gif":
             return convert_video(src, target_ext, out_dir)
 
+    # HTML → 이미지 / PDF / 영상
+    if src_cat == "web":
+        if tgt_cat == "image":
+            return html_to_image(src, target_ext, out_dir)
+        if target_ext == ".pdf":
+            return html_to_pdf(src, out_dir)
+        if target_ext in (".mp4", ".gif", ".webm"):
+            return html_to_video(src, target_ext, out_dir)
+
     print(f"  [오류] {src_ext} → {target_ext} 변환은 지원되지 않습니다")
     return False
 
@@ -410,6 +599,7 @@ def print_help():
     print(f"  문서:   {', '.join(sorted(DOC_EXTS))}")
     print(f"  오디오: {', '.join(sorted(AUDIO_EXTS))}")
     print(f"  비디오: {', '.join(sorted(VIDEO_EXTS))}")
+    print(f"  웹:     {', '.join(sorted(WEB_EXTS))}  (Playwright 필요)")
 
 
 def interactive_mode():

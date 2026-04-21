@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="이미지·PDF 변환기 · 브라우저에서 즉시 · 업로드 없음">
+<!--
+  All-to-All (Static Edition)
+  완전 클라이언트 사이드: 파일은 브라우저 밖으로 나가지 않습니다.
+  지원: 이미지 ↔ 이미지, 이미지 → PDF, PDF → 이미지
+  서버 기능(영상/HTML/HWP)은 로컬 서버 버전 필요
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:;">
+<title>All-to-All Converter (Web)</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>All-to-All Converter</h1>
+    <p class="subtitle">이미지 · PDF 변환 · 브라우저에서 즉시 · 업로드 없음</p>
+  </header>
+
+  <!-- Mode banner: links to full server version -->
+  <div class="mode-banner">
+    <span class="mode-badge">🌐 웹 버전</span>
+    <span class="mode-desc">이미지/PDF만 지원</span>
+    <a href="https://github.com/commme/all-to-all#%EC%84%A4%EC%B9%98" class="mode-link" target="_blank" rel="noopener">
+      영상·HTML·HWP 변환이 필요하면 → 로컬 서버 버전 설치
+    </a>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">📁</div>
+    <div class="dropzone-text">
+      파일을 여기에 드래그하거나 <strong>클릭</strong>하여 선택
+    </div>
+    <div class="dropzone-hint">여러 파일 동시 선택 가능 · 완전 오프라인</div>
+  </div>
+  <input type="file" id="fileInput" multiple
+         accept=".png,.jpg,.jpeg,.webp,.bmp,.gif,.pdf">
+
+  <div class="file-list" id="fileList">
+    <div class="file-list-header">
+      <div class="file-count" id="fileCount"></div>
+      <button class="clear-btn" id="clearBtn">전체 삭제</button>
+    </div>
+    <div id="fileItems"></div>
+  </div>
+
+  <div class="format-section" id="formatSection">
+    <div class="format-label" id="formatLabel">변환할 포맷 선택</div>
+    <div class="format-grid" id="formatGrid"></div>
+  </div>
+
+  <button class="convert-btn" id="convertBtn">변환하기</button>
+
+  <div class="progress" id="progress">
+    <div class="spinner"></div>
+    <div class="progress-text" id="progressText">변환 중...</div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-icon" id="resultIcon"></div>
+    <div class="result-msg" id="resultMsg"></div>
+    <button class="again-btn" id="againBtn">다시 변환하기</button>
+  </div>
+
+  <!-- Unsupported notice for server-only formats -->
+  <div class="unsupported" id="unsupported">
+    <div class="unsupported-icon">⚠️</div>
+    <div class="unsupported-title" id="unsupportedTitle">이 포맷은 웹 버전에서 지원하지 않습니다</div>
+    <div class="unsupported-desc">영상(MP4/MOV), 오디오(MP3/WAV), HTML, HWP/DOCX 변환은 로컬 서버 버전이 필요합니다.</div>
+    <a href="https://github.com/commme/all-to-all#%EC%84%A4%EC%B9%98" class="unsupported-link" target="_blank" rel="noopener">
+      로컬 서버 버전 설치 가이드 →
+    </a>
+  </div>
+
+  <section class="supported">
+    <div class="supported-title">웹 버전 지원 변환</div>
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">PNG / JPG / WEBP / BMP / GIF</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">PNG</span>
+          <span class="sup-target">JPG</span>
+          <span class="sup-target">WEBP</span>
+          <span class="sup-target">PDF</span>
+        </div>
+      </div>
+      <div class="sup-desc">이미지 포맷 상호 변환 · 이미지 → PDF 문서화</div>
+    </div>
+    <div class="sup-card">
+      <div class="sup-card-top">
+        <span class="sup-from">PDF</span>
+        <span class="sup-arrow">→</span>
+        <div class="sup-to">
+          <span class="sup-target">PNG</span>
+          <span class="sup-target">JPG</span>
+          <span class="sup-target">WEBP</span>
+        </div>
+      </div>
+      <div class="sup-desc">PDF 페이지를 이미지로 추출 (각 페이지 별도 파일)</div>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/commme/all-to-all" target="_blank" rel="noopener">GitHub</a>
+    · © 2026 COMMME · Built with Claude Code
+  </footer>
+</div>
+
+<!-- pdf.js for PDF → image, jsPDF for image → PDF -->
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs" type="module"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

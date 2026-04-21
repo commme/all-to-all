@@ -14,6 +14,7 @@ import zipfile
 import tempfile
 from pathlib import Path
 from flask import Flask, request, send_file, jsonify, render_template
+from werkzeug.utils import secure_filename
 
 from convert import convert, get_category, OUTPUT_DIR
 
@@ -47,6 +48,12 @@ QUICK_RULES = {
         {"ext": ".mp4",  "name": "MP4",  "desc": "범용 영상 변환"},
         {"ext": ".wav",  "name": "WAV",  "desc": "무손실 음성 추출"},
     ],
+    "web": [
+        {"ext": ".png",  "name": "PNG",  "desc": "스크린샷 (권장)"},
+        {"ext": ".pdf",  "name": "PDF",  "desc": "PDF 저장"},
+        {"ext": ".mp4",  "name": "MP4",  "desc": "애니메이션 영상 (8초)"},
+        {"ext": ".gif",  "name": "GIF",  "desc": "애니메이션 움짤"},
+    ],
 }
 
 
@@ -63,6 +70,8 @@ def get_quick_targets(ext: str) -> list[dict]:
         targets = QUICK_RULES["image"]
     elif cat == "video":
         targets = QUICK_RULES["video"]
+    elif cat == "web":
+        targets = QUICK_RULES["web"]
     else:
         targets = []
 
@@ -104,11 +113,18 @@ def do_convert():
     results = []
 
     try:
-        # 1) 업로드 저장
+        # 1) 업로드 저장 (파일명 sanitize + UPLOAD_DIR 경계 확인)
+        upload_root = UPLOAD_DIR.resolve()
         for f in files:
             if not f.filename:
                 continue
-            path = UPLOAD_DIR / f.filename
+            safe_name = secure_filename(f.filename)
+            if not safe_name:
+                continue
+            path = (UPLOAD_DIR / safe_name).resolve()
+            # path traversal 방어: 결과 경로가 UPLOAD_DIR 내부인지 확인
+            if upload_root != path.parent and upload_root not in path.parents:
+                continue
             f.save(str(path))
             saved.append(path)
 
@@ -150,4 +166,5 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
     print(f"\n  All-to-All Converter")
     print(f"  http://localhost:{port}\n")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    # 보안: localhost 바인딩 고정, debug 비활성화 (Werkzeug /console RCE 차단)
+    app.run(host="127.0.0.1", port=port, debug=False)
